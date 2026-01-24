@@ -1,6 +1,6 @@
-# 🧠 Automatic Cursor Installation Script for Ubuntu Linux
+# 🧠 Cursor Installation Script for Linux
 
-This script installs **Cursor** on **Ubuntu Linux** systems, using the latest version available online.
+This script install **Cursor** on **Debian Linux** systems or derivated, using the latest version available online.
 
 Cursor is a code editor based on VS Code, optimized with artificial intelligence, ideal for developers who want an enhanced development experience.
 
