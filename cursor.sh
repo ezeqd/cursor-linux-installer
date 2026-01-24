@@ -5,6 +5,7 @@ set -e
 # Variables
 CURSOR_DIR="$HOME/.local/bin"
 CURSOR_BIN="$CURSOR_DIR/cursor"
+VERSION_FILE="$CURSOR_DIR/.cursor-version"
 DESKTOP_FILE="$HOME/.local/share/applications/cursor.desktop"
 ICON_TARGET="$HOME/.local/share/icons/cursor.png"
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
@@ -20,16 +21,44 @@ check_installation() {
     fi
 }
 
+# Check if Cursor is currently running
+is_cursor_running() {
+    if pgrep -f "$CURSOR_BIN" > /dev/null 2>&1; then
+        return 0  # Running
+    else
+        return 1  # Not running
+    fi
+}
+
 # Get installation status text
 get_status_text() {
     if check_installation; then
-        echo "Installed"
+        local version
+        version=$(get_installed_version)
+        if [[ "$version" == "unknown" ]]; then
+            echo "Installed (version unknown)"
+        else
+            echo "Installed (v$version)"
+        fi
     else
         echo "Not installed"
     fi
 }
 
-# Get the latest AppImage URL
+# Get installed version (from version file)
+get_installed_version() {
+    if check_installation; then
+        if [ -f "$VERSION_FILE" ]; then
+            cat "$VERSION_FILE"
+        else
+            echo "unknown"
+        fi
+    else
+        echo "not installed"
+    fi
+}
+
+# Get the latest AppImage URL and extract version
 get_latest_appimage_url() {
     echo "🔍 Fetching version-history.json..."
     APPIMAGE_URL=$(curl -s "$VERSION_JSON" | grep -oP 'https.*?Cursor-.*?\.AppImage' | head -n 1)
@@ -38,6 +67,9 @@ get_latest_appimage_url() {
         echo "❌ Could not get AppImage file from version-history.json. Aborting."
         exit 1
     fi
+    
+    # Extract version from URL (format: Cursor-X.X.X.AppImage)
+    LATEST_VERSION=$(echo "$APPIMAGE_URL" | grep -oP 'Cursor-\K\d+\.\d+\.\d+')
 }
 
 # Download and install the AppImage
@@ -46,6 +78,9 @@ download_appimage() {
     echo "$APPIMAGE_URL"
     curl -L "$APPIMAGE_URL" -o "$CURSOR_BIN"
     chmod +x "$CURSOR_BIN"
+    
+    # Save version to file for future reference
+    echo "$LATEST_VERSION" > "$VERSION_FILE"
 }
 
 # Full installation (new install)
@@ -56,6 +91,14 @@ install_cursor() {
         read -p "⚠️ Cursor is already installed. Reinstall? [y/N]: " confirm
         if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
             echo "Installation cancelled."
+            return
+        fi
+        
+        # Check if Cursor is running before reinstalling
+        if is_cursor_running; then
+            echo ""
+            echo "❌ Cursor is currently running."
+            echo "   Please close Cursor before reinstalling."
             return
         fi
     fi
@@ -118,18 +161,65 @@ update_cursor() {
     if ! check_installation; then
         echo ""
         echo "❌ Cursor is not installed. Please install it first."
-        return
+        return 1
+    fi
+
+    # Check if Cursor is running
+    if is_cursor_running; then
+        echo ""
+        echo "❌ Cursor is currently running."
+        echo "   Please close Cursor before updating."
+        echo ""
+        echo "   Tip: Save your work and close all Cursor windows,"
+        echo "   then try again."
+        return 1
     fi
 
     echo ""
-    echo "🔄 Updating Cursor..."
+    echo "🔄 Checking for updates..."
     
-    # Get and download AppImage (replaces existing)
+    # Get installed version
+    local installed_version
+    installed_version=$(get_installed_version)
+    
+    if [[ "$installed_version" == "unknown" ]]; then
+        echo "📦 Installed version: unknown (installed before version tracking)"
+    else
+        echo "📦 Installed version: $installed_version"
+    fi
+    
+    # Get latest version available
     get_latest_appimage_url
+    echo "🌐 Latest version: $LATEST_VERSION"
+    
+    # Compare versions (if unknown, always update)
+    if [[ "$installed_version" == "$LATEST_VERSION" ]]; then
+        echo ""
+        echo "✅ You already have the latest version installed."
+        return 1
+    fi
+    
+    # If version is unknown, ask for confirmation
+    if [[ "$installed_version" == "unknown" ]]; then
+        echo ""
+        read -p "⚠️ Cannot determine current version. Update anyway? [y/N]: " confirm
+        if [[ ! "$confirm" =~ ^[Yy]$ ]]; then
+            echo "Update cancelled."
+            return 1
+        fi
+    fi
+    
+    echo ""
+    echo "📥 Downloading new version..."
     download_appimage
     
     echo ""
-    echo "✅ Cursor updated successfully."
+    if [[ "$installed_version" == "unknown" ]]; then
+        echo "✅ Cursor updated successfully to v$LATEST_VERSION"
+    else
+        echo "✅ Cursor updated successfully: $installed_version → $LATEST_VERSION"
+    fi
+    return 0
 }
 
 # Uninstall Cursor
@@ -154,6 +244,12 @@ uninstall_cursor() {
     if [ -f "$CURSOR_BIN" ]; then
         rm -f "$CURSOR_BIN"
         echo "   Removed $CURSOR_BIN"
+    fi
+
+    # Remove version file
+    if [ -f "$VERSION_FILE" ]; then
+        rm -f "$VERSION_FILE"
+        echo "   Removed $VERSION_FILE"
     fi
 
     # Remove desktop file
@@ -209,7 +305,11 @@ show_menu() {
                 read -p "Press Enter to continue..."
                 ;;
             2)
-                update_cursor
+                if update_cursor; then
+                    echo ""
+                    echo "👋 Goodbye!"
+                    exit 0
+                fi
                 echo ""
                 read -p "Press Enter to continue..."
                 ;;
