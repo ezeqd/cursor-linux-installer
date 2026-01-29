@@ -13,7 +13,7 @@ This script automates the following steps:
 - ✅ Downloads the latest Cursor `.AppImage` version from the official repository
 - ✅ Grants execution permissions
 - ✅ Installs it in the `~/.local/bin/` directory
-- ✅ Creates a terminal alias so you can launch it by simply typing `cursor`
+- ✅ Creates a `cursor` command to launch the editor from your terminal without blocking it
 - ✅ Creates a desktop shortcut (`.desktop`) to integrate it with the application menu
 - ✅ Associates a custom icon
 
@@ -70,13 +70,8 @@ cursor
 
 ## 🧹 How to Uninstall Cursor
 
-To remove Cursor and everything this script installed, you can run the following commands:
+To remove Cursor and all the files created by the script, just run the script with the `uninstall` argument:
 
 ```bash
-rm ~/.local/bin/cursor
-rm ~/.local/share/applications/cursor.desktop
-rm ~/.local/share/icons/cursor.png
-sed -i '/alias cursor=/d' ~/.bashrc && source ~/.bashrc
+./cursor.sh uninstall
 ```
-
-⚠️ If you use Zsh, replace `.bashrc` with `.zshrc`.
