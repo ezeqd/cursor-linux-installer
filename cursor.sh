@@ -141,12 +141,22 @@ EOF
         SHELL_RC="$HOME/.zshrc"
     fi
     
-    if ! grep -q "alias cursor=" "$SHELL_RC"; then
-        echo "🔗 Adding alias to $SHELL_RC"
-        echo "alias cursor=\"$CURSOR_BIN --no-sandbox\"" >> "$SHELL_RC"
-    else
-        echo "✔️ Alias already exists in $SHELL_RC"
-    fi
+    # Remove any old alias or function definition for 'cursor' to ensure a clean slate
+    sed -i -e '/alias cursor=/d' -e '/# START CURSOR FUNCTION/,/# END CURSOR FUNCTION/d' "$SHELL_RC" 2>/dev/null
+    
+    # Add the new cursor function
+    echo "🔗 Adding/updating cursor function in $SHELL_RC"
+    cat <<'EOF' >> "$SHELL_RC"
+
+# START CURSOR FUNCTION
+# Defines 'cursor' command to run in the background
+function cursor {
+    (
+        nohup "$HOME/.local/bin/cursor" --no-sandbox "$@" >/dev/null 2>&1 &
+    )
+}
+# END CURSOR FUNCTION
+EOF
     
     echo ""
     echo "✅ Cursor installed successfully."
@@ -264,16 +274,18 @@ uninstall_cursor() {
         echo "   Removed $ICON_TARGET"
     fi
 
-    # Remove alias from .bashrc
+    # Remove function from .bashrc
     if [ -f "$HOME/.bashrc" ]; then
-        sed -i '/alias cursor=/d' "$HOME/.bashrc" 2>/dev/null
-        echo "   Removed alias from .bashrc"
+        sed -i '/# START CURSOR FUNCTION/,/# END CURSOR FUNCTION/d' "$HOME/.bashrc" 2>/dev/null
+        sed -i '/^$/N;/^\\n$/D' "$HOME/.bashrc" # remove excessive newlines
+        echo "   Removed cursor function from .bashrc"
     fi
 
-    # Remove alias from .zshrc
+    # Remove function from .zshrc
     if [ -f "$HOME/.zshrc" ]; then
-        sed -i '/alias cursor=/d' "$HOME/.zshrc" 2>/dev/null
-        echo "   Removed alias from .zshrc"
+        sed -i '/# START CURSOR FUNCTION/,/# END CURSOR FUNCTION/d' "$HOME/.zshrc" 2>/dev/null
+        sed -i '/^$/N;/^\\n$/D' "$HOME/.zshrc" # remove excessive newlines
+        echo "   Removed cursor function from .zshrc"
     fi
 
     echo ""
